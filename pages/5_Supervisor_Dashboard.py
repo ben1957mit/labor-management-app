@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import altair as alt
 import sqlite3
-import os
+import json
 
 st.set_page_config(page_title="Supervisor Dashboard", layout="wide")
 
@@ -28,18 +28,18 @@ CREATE TABLE IF NOT EXISTS records (
 conn.commit()
 
 # -----------------------------
-# SUPERVISOR PIN
+# SUPERVISOR PIN ACCESS GATE
 # -----------------------------
 st.sidebar.title("Supervisor Access")
 pin = st.sidebar.text_input("Enter Supervisor PIN", type="password")
-CORRECT_PIN = "1234"  # change this
+CORRECT_PIN = "1234"  # Change this PIN
 
 if pin != CORRECT_PIN:
     st.warning("Supervisor PIN required.")
     st.stop()
 
 st.title("🧑‍💼 Supervisor Dashboard")
-st.write("Analyze trends, variances, KPIs, trailers, and labor standards.")
+st.write("Supervisor-only analytics, KPIs, variances, and trailer dashboards.")
 
 # -----------------------------
 # LOAD DATA
@@ -47,7 +47,7 @@ st.write("Analyze trends, variances, KPIs, trailers, and labor standards.")
 df = pd.read_sql_query("SELECT * FROM records", conn)
 
 if df.empty:
-    st.warning("No data available yet. Operators must enter at least one day.")
+    st.warning("No data available yet.")
     st.stop()
 
 df["Date"] = pd.to_datetime(df["Date"])
@@ -55,8 +55,6 @@ df["Date"] = pd.to_datetime(df["Date"])
 # -----------------------------
 # UNPACK JSON FIELDS
 # -----------------------------
-import json
-
 expanded_rows = []
 for _, row in df.iterrows():
     base = {
@@ -73,21 +71,18 @@ for _, row in df.iterrows():
 
 df = pd.DataFrame(expanded_rows)
 
-# -----------------------------
-# LATEST DAY
-# -----------------------------
 latest = df.sort_values("Date").iloc[-1]
 
 # -----------------------------
 # LABOR STANDARDS
 # -----------------------------
 st.sidebar.markdown("### Labor Standards")
-target_uph = st.sidebar.number_input("Target Units per Labor Hour", min_value=0.0, value=20.0, step=1.0)
-target_oplh = st.sidebar.number_input("Target Orders per Labor Hour", min_value=0.0, value=8.0, step=0.5)
+target_uph = st.sidebar.number_input("Target Units per Labor Hour", min_value=0.0, value=20.0)
+target_oplh = st.sidebar.number_input("Target Orders per Labor Hour", min_value=0.0, value=8.0)
 
-labor_hours = latest["Labor Hours"]
 units = latest["Units Produced"]
 orders = latest["Orders Processed"]
+labor_hours = latest["Labor Hours"]
 
 actual_uph = units / labor_hours if labor_hours > 0 else None
 actual_oplh = orders / labor_hours if labor_hours > 0 else None
@@ -103,9 +98,9 @@ def kpi_color_emoji(actual, low, high):
         return "🟨"
 
 # -----------------------------
-# SUMMARY METRICS
+# SUMMARY METRICS & KPIs
 # -----------------------------
-st.subheader("📊 Summary & Labor Standards")
+st.subheader("📊 Summary Metrics & Labor Standards KPIs")
 
 col1, col2, col3 = st.columns(3)
 col1.metric("Units Produced (Latest)", f"{units:,}")
@@ -113,28 +108,21 @@ col2.metric("Orders Processed (Latest)", f"{orders:,}")
 col3.metric("Labor Hours (Latest)", f"{labor_hours:.2f}")
 
 k1, k2 = st.columns(2)
-if actual_uph is not None:
-    k1.markdown(
-        f"{kpi_color_emoji(actual_uph, target_uph * 0.8, target_uph)} "
-        f"**Units per Labor Hour:** {actual_uph:.2f} (Target: {target_uph:.2f})"
-    )
-else:
-    k1.markdown("⚪ **Units per Labor Hour:** N/A")
-
-if actual_oplh is not None:
-    k2.markdown(
-        f"{kpi_color_emoji(actual_oplh, target_oplh * 0.8, target_oplh)} "
-        f"**Orders per Labor Hour:** {actual_oplh:.2f} (Target: {target_oplh:.2f})"
-    )
-else:
-    k2.markdown("⚪ **Orders per Labor Hour:** N/A")
+k1.markdown(
+    f"{kpi_color_emoji(actual_uph, target_uph * 0.8, target_uph)} "
+    f"**Units per Labor Hour:** {actual_uph:.2f} (Target: {target_uph})"
+)
+k2.markdown(
+    f"{kpi_color_emoji(actual_oplh, target_oplh * 0.8, target_oplh)} "
+    f"**Orders per Labor Hour:** {actual_oplh:.2f} (Target: {target_oplh})"
+)
 
 st.markdown("---")
 
 # -----------------------------
-# VARIANCE TABLE
+# VARIANCE TABLE WITH COLOR CODING
 # -----------------------------
-st.subheader("Variance by Cost Item (Latest Day)")
+st.subheader("📉 Variance Table (Latest Day)")
 
 variance_cols = [c for c in df.columns if c.startswith("Variance_")]
 latest_variances = latest[variance_cols].reset_index()
@@ -154,7 +142,7 @@ st.dataframe(latest_variances.style.applymap(color_variance, subset=["Variance"]
 st.markdown("---")
 
 # -----------------------------
-# TRAILER / INBOUND / OUTBOUND DASHBOARD
+# INBOUND / OUTBOUND / TRAILER DASHBOARD
 # -----------------------------
 st.subheader("🚚 Inbound / Outbound / Trailer Dashboard")
 
@@ -165,8 +153,8 @@ lumper = latest.get("Actual_Lumper Fees", 0)
 pallets = latest.get("Actual_Pallet Costs", 0)
 
 t1, t2, t3 = st.columns(3)
-t1.metric("Inbound Loads", f"{inbound:.0f}")
-t2.metric("Outbound Loads", f"{outbound:.0f}")
+t1.metric("Inbound Loads", f"{inbound}")
+t2.metric("Outbound Loads", f"{outbound}")
 t3.metric("Detention Fees", f"${detention:,.2f}")
 
 t4, t5 = st.columns(2)
@@ -193,7 +181,7 @@ colB.dataframe(bottom3, use_container_width=True)
 st.markdown("---")
 
 # -----------------------------
-# TREND CHARTS
+# MULTI-DAY TREND CHARTS
 # -----------------------------
 st.subheader("📈 Multi‑Day Trend Charts")
 
@@ -213,7 +201,7 @@ st.altair_chart(trend_chart, use_container_width=True)
 st.markdown("---")
 
 # -----------------------------
-# EXPORT TO EXCEL
+# DATA EXPORT
 # -----------------------------
 st.subheader("📤 Export Data")
 
@@ -227,3 +215,10 @@ with open(excel_file, "rb") as f:
         file_name="daily_cost_records_export.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
+
+
+ 
+   
+      
+
+
