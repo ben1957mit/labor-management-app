@@ -143,18 +143,10 @@ else:
     latest_variances.columns = ["Cost Item", "Variance"]
     latest_variances["Cost Item"] = latest_variances["Cost Item"].str.replace("Variance_", "")
 
-    def color_variance(val):
-        if val < -5:
-            return "background-color: green; color: white"
-        elif -5 <= val <= 5:
-            return "background-color: yellow; color: black"
-        else:
-            return "background-color: red; color: white"
-
-    st.dataframe(
-        latest_variances.style.applymap(color_variance, subset=["Variance"]),
-        use_container_width=True
-    )
+    if latest_variances.empty:
+        st.info("Variance data exists but contains no values.")
+    else:
+        st.dataframe(latest_variances, use_container_width=True)
 
 st.markdown("---")
 
@@ -234,11 +226,3 @@ with open(excel_file, "rb") as f:
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
 
-
-  
-
-
-
-
-  
-   
