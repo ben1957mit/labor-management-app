@@ -143,8 +143,14 @@ else:
     latest_variances.columns = ["Cost Item", "Variance"]
     latest_variances["Cost Item"] = latest_variances["Cost Item"].str.replace("Variance_", "")
 
+    # Convert to numeric safely
+    latest_variances["Variance"] = pd.to_numeric(latest_variances["Variance"], errors="coerce")
+
+    # Drop rows where variance is missing
+    latest_variances = latest_variances.dropna(subset=["Variance"])
+
     if latest_variances.empty:
-        st.info("Variance data exists but contains no values.")
+        st.info("Variance data exists but contains no valid numeric values.")
     else:
         st.dataframe(latest_variances, use_container_width=True)
 
@@ -179,6 +185,8 @@ st.subheader("🔺 Top 3 Over / Under Budget Items")
 
 if not variance_cols:
     st.info("No variance data available.")
+elif latest_variances.empty:
+    st.info("No valid numeric variance values to rank.")
 else:
     top3 = latest_variances.nlargest(3, "Variance")
     bottom3 = latest_variances.nsmallest(3, "Variance")
@@ -225,4 +233,3 @@ with open(excel_file, "rb") as f:
         file_name="daily_cost_records_export.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
-
