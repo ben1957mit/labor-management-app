@@ -21,7 +21,8 @@ CREATE TABLE IF NOT EXISTS records (
     UnitsProduced REAL,
     OrdersProcessed REAL,
     LaborHours REAL,
-    Data JSON
+    Data JSON,
+    Site TEXT
 )
 """)
 conn.commit()
@@ -33,9 +34,13 @@ st.title("📥 Daily Operator Entry")
 # -----------------------------
 with st.form("entry_form"):
 
-    st.subheader("Production Metrics")
+    st.subheader("Production Information")
+
+    site = st.selectbox("Site", ["Dallas", "Plano", "Houston"])
+
     date = st.date_input("Date")
     shift = st.selectbox("Shift", ["1", "2", "3"])
+
     units = st.number_input("Units Produced", min_value=0.0)
     orders = st.number_input("Orders Processed", min_value=0.0)
     labor = st.number_input("Labor Hours", min_value=0.0)
@@ -56,6 +61,7 @@ with st.form("entry_form"):
         variance[item] = actual[item] - budget[item]
 
     st.subheader("Trailer / Inbound / Outbound Metrics")
+
     inbound = st.number_input("Inbound Loads", min_value=0.0)
     outbound = st.number_input("Outbound Loads", min_value=0.0)
     detention = st.number_input("Detention Fees", min_value=0.0)
@@ -71,6 +77,7 @@ if submitted:
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     data = {
+        # Budget / Actual / Variance
         "Budget_Labor": budget["Labor"],
         "Actual_Labor": actual["Labor"],
         "Variance_Labor": variance["Labor"],
@@ -91,6 +98,7 @@ if submitted:
         "Actual_Admin": actual["Admin"],
         "Variance_Admin": variance["Admin"],
 
+        # Trailer Metrics
         "Actual_Inbound Loads": inbound,
         "Actual_Outbound Loads": outbound,
         "Actual_Detention Fees": detention,
@@ -99,7 +107,7 @@ if submitted:
     }
 
     cursor.execute("""
-        INSERT INTO records VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO records VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         timestamp,
         str(date),
@@ -107,9 +115,9 @@ if submitted:
         units,
         orders,
         labor,
-        json.dumps(data)
+        json.dumps(data),
+        site
     ))
 
     conn.commit()
     st.success("Record saved successfully!")
-
