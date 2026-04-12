@@ -219,17 +219,22 @@ st.altair_chart(trend_chart, use_container_width=True)
 st.markdown("---")
 
 # -----------------------------
-# EXPORT DATA
+# EXPORT DATA (CSV – no dependencies)
 # -----------------------------
 st.subheader("📤 Export Data")
 
-excel_file = "daily_cost_records_export.xlsx"
-df.to_excel(excel_file, index=False)
+csv_data = df.to_csv(index=False).encode("utf-8")
 
-with open(excel_file, "rb") as f:
-    st.download_button(
-        label="Download All Records as Excel",
-        data=f,
-        file_name="daily_cost_records_export.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    )
+st.download_button(
+    label="Download All Records as CSV",
+    data=csv_data,
+    file_name="daily_cost_records_export.csv",
+    mime="text/csv",
+)
+
+
+
+
+  
+
+
