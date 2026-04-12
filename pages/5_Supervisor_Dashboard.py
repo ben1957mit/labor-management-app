@@ -32,14 +32,13 @@ conn.commit()
 # -----------------------------
 st.sidebar.title("Supervisor Access")
 pin = st.sidebar.text_input("Enter Supervisor PIN", type="password")
-CORRECT_PIN = "1234"  # Change this if needed
+CORRECT_PIN = "1234"
 
 if pin != CORRECT_PIN:
     st.warning("Supervisor PIN required.")
     st.stop()
 
 st.title("🧑‍💼 Supervisor Dashboard")
-st.write("Supervisor-only analytics, KPIs, variances, and trailer dashboards.")
 
 # -----------------------------
 # LOAD DATA
@@ -112,22 +111,21 @@ col3.metric("Labor Hours (Latest)", f"{labor_hours:.2f}")
 
 k1, k2 = st.columns(2)
 
-# Safe KPI formatting
 if actual_uph is not None:
     k1.markdown(
         f"{kpi_color_emoji(actual_uph, target_uph * 0.8, target_uph)} "
-        f"**Units per Labor Hour:** {actual_uph:.2f} (Target: {target_uph})"
+        f"**Units per Labor Hour:** {actual_uph:.2f}"
     )
 else:
-    k1.markdown("⚪ **Units per Labor Hour:** N/A (No labor hours recorded)")
+    k1.markdown("⚪ **Units per Labor Hour:** N/A")
 
 if actual_oplh is not None:
     k2.markdown(
         f"{kpi_color_emoji(actual_oplh, target_oplh * 0.8, target_oplh)} "
-        f"**Orders per Labor Hour:** {actual_oplh:.2f} (Target: {target_oplh})"
+        f"**Orders per Labor Hour:** {actual_oplh:.2f}"
     )
 else:
-    k2.markdown("⚪ **Orders per Labor Hour:** N/A (No labor hours recorded)")
+    k2.markdown("⚪ **Orders per Labor Hour:** N/A")
 
 st.markdown("---")
 
@@ -236,3 +234,11 @@ with open(excel_file, "rb") as f:
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
 
+
+  
+
+
+
+
+  
+   
