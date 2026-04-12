@@ -28,11 +28,11 @@ CREATE TABLE IF NOT EXISTS records (
 conn.commit()
 
 # -----------------------------
-# SUPERVISOR PIN ACCESS GATE
+# SUPERVISOR PIN ACCESS
 # -----------------------------
 st.sidebar.title("Supervisor Access")
 pin = st.sidebar.text_input("Enter Supervisor PIN", type="password")
-CORRECT_PIN = "1234"  # Change this PIN
+CORRECT_PIN = "1234"  # Change this if needed
 
 if pin != CORRECT_PIN:
     st.warning("Supervisor PIN required.")
@@ -47,7 +47,7 @@ st.write("Supervisor-only analytics, KPIs, variances, and trailer dashboards.")
 df = pd.read_sql_query("SELECT * FROM records", conn)
 
 if df.empty:
-    st.warning("No data available yet.")
+    st.info("No data available yet. Please enter data on the Operator Entry page.")
     st.stop()
 
 df["Date"] = pd.to_datetime(df["Date"])
@@ -65,8 +65,11 @@ for _, row in df.iterrows():
         "Orders Processed": row["OrdersProcessed"],
         "Labor Hours": row["LaborHours"],
     }
-    extra = json.loads(row["Data"])
-    base.update(extra)
+    try:
+        extra = json.loads(row["Data"])
+        base.update(extra)
+    except:
+        pass
     expanded_rows.append(base)
 
 df = pd.DataFrame(expanded_rows)
@@ -80,12 +83,12 @@ st.sidebar.markdown("### Labor Standards")
 target_uph = st.sidebar.number_input("Target Units per Labor Hour", min_value=0.0, value=20.0)
 target_oplh = st.sidebar.number_input("Target Orders per Labor Hour", min_value=0.0, value=8.0)
 
-units = latest["Units Produced"]
-orders = latest["Orders Processed"]
-labor_hours = latest["Labor Hours"]
+units = latest.get("Units Produced", 0)
+orders = latest.get("Orders Processed", 0)
+labor_hours = latest.get("Labor Hours", 0)
 
-actual_uph = units / labor_hours if labor_hours > 0 else None
-actual_oplh = orders / labor_hours if labor_hours > 0 else None
+actual_uph = units / labor_hours if labor_hours and labor_hours > 0 else None
+actual_oplh = orders / labor_hours if labor_hours and labor_hours > 0 else None
 
 def kpi_color_emoji(actual, low, high):
     if actual is None:
@@ -98,7 +101,7 @@ def kpi_color_emoji(actual, low, high):
         return "🟨"
 
 # -----------------------------
-# SUMMARY METRICS & KPIs
+# SUMMARY METRICS
 # -----------------------------
 st.subheader("📊 Summary Metrics & Labor Standards KPIs")
 
@@ -108,41 +111,57 @@ col2.metric("Orders Processed (Latest)", f"{orders:,}")
 col3.metric("Labor Hours (Latest)", f"{labor_hours:.2f}")
 
 k1, k2 = st.columns(2)
-k1.markdown(
-    f"{kpi_color_emoji(actual_uph, target_uph * 0.8, target_uph)} "
-    f"**Units per Labor Hour:** {actual_uph:.2f} (Target: {target_uph})"
-)
-k2.markdown(
-    f"{kpi_color_emoji(actual_oplh, target_oplh * 0.8, target_oplh)} "
-    f"**Orders per Labor Hour:** {actual_oplh:.2f} (Target: {target_oplh})"
-)
+
+# Safe KPI formatting
+if actual_uph is not None:
+    k1.markdown(
+        f"{kpi_color_emoji(actual_uph, target_uph * 0.8, target_uph)} "
+        f"**Units per Labor Hour:** {actual_uph:.2f} (Target: {target_uph})"
+    )
+else:
+    k1.markdown("⚪ **Units per Labor Hour:** N/A (No labor hours recorded)")
+
+if actual_oplh is not None:
+    k2.markdown(
+        f"{kpi_color_emoji(actual_oplh, target_oplh * 0.8, target_oplh)} "
+        f"**Orders per Labor Hour:** {actual_oplh:.2f} (Target: {target_oplh})"
+    )
+else:
+    k2.markdown("⚪ **Orders per Labor Hour:** N/A (No labor hours recorded)")
 
 st.markdown("---")
 
 # -----------------------------
-# VARIANCE TABLE WITH COLOR CODING
+# VARIANCE TABLE
 # -----------------------------
 st.subheader("📉 Variance Table (Latest Day)")
 
 variance_cols = [c for c in df.columns if c.startswith("Variance_")]
-latest_variances = latest[variance_cols].reset_index()
-latest_variances.columns = ["Cost Item", "Variance"]
-latest_variances["Cost Item"] = latest_variances["Cost Item"].str.replace("Variance_", "")
 
-def color_variance(val):
-    if val < -5:
-        return "background-color: green; color: white"
-    elif -5 <= val <= 5:
-        return "background-color: yellow; color: black"
-    else:
-        return "background-color: red; color: white"
+if not variance_cols:
+    st.info("No variance data found. Enter budget/actual values on the Operator Entry page.")
+else:
+    latest_variances = latest[variance_cols].reset_index()
+    latest_variances.columns = ["Cost Item", "Variance"]
+    latest_variances["Cost Item"] = latest_variances["Cost Item"].str.replace("Variance_", "")
 
-st.dataframe(latest_variances.style.applymap(color_variance, subset=["Variance"]), use_container_width=True)
+    def color_variance(val):
+        if val < -5:
+            return "background-color: green; color: white"
+        elif -5 <= val <= 5:
+            return "background-color: yellow; color: black"
+        else:
+            return "background-color: red; color: white"
+
+    st.dataframe(
+        latest_variances.style.applymap(color_variance, subset=["Variance"]),
+        use_container_width=True
+    )
 
 st.markdown("---")
 
 # -----------------------------
-# INBOUND / OUTBOUND / TRAILER DASHBOARD
+# TRAILER DASHBOARD
 # -----------------------------
 st.subheader("🚚 Inbound / Outbound / Trailer Dashboard")
 
@@ -168,27 +187,28 @@ st.markdown("---")
 # -----------------------------
 st.subheader("🔺 Top 3 Over / Under Budget Items")
 
-top3 = latest_variances.nlargest(3, "Variance")
-bottom3 = latest_variances.nsmallest(3, "Variance")
+if not variance_cols:
+    st.info("No variance data available.")
+else:
+    top3 = latest_variances.nlargest(3, "Variance")
+    bottom3 = latest_variances.nsmallest(3, "Variance")
 
-colA, colB = st.columns(2)
-colA.write("### Over Budget")
-colA.dataframe(top3, use_container_width=True)
+    colA, colB = st.columns(2)
+    colA.write("### Over Budget")
+    colA.dataframe(top3, use_container_width=True)
 
-colB.write("### Under Budget")
-colB.dataframe(bottom3, use_container_width=True)
+    colB.write("### Under Budget")
+    colB.dataframe(bottom3, use_container_width=True)
 
 st.markdown("---")
 
 # -----------------------------
-# MULTI-DAY TREND CHARTS
+# TREND CHARTS
 # -----------------------------
 st.subheader("📈 Multi‑Day Trend Charts")
 
-metric = st.selectbox(
-    "Select Trend Metric",
-    ["Units Produced", "Orders Processed"] + variance_cols
-)
+trend_options = ["Units Produced", "Orders Processed"] + variance_cols
+metric = st.selectbox("Select Trend Metric", trend_options)
 
 trend_chart = alt.Chart(df).mark_line(point=True).encode(
     x="Date:T",
@@ -201,7 +221,7 @@ st.altair_chart(trend_chart, use_container_width=True)
 st.markdown("---")
 
 # -----------------------------
-# DATA EXPORT
+# EXPORT DATA
 # -----------------------------
 st.subheader("📤 Export Data")
 
@@ -215,10 +235,4 @@ with open(excel_file, "rb") as f:
         file_name="daily_cost_records_export.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
-
-
- 
-   
-      
-
 
