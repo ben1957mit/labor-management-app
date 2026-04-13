@@ -43,22 +43,22 @@ for _, row in df.iterrows():
 df = pd.DataFrame(expanded_rows)
 
 # -----------------------------
-# SITE-AWARE FILTERING
+# SITE FILTER
 # -----------------------------
 st.sidebar.title("Filters")
 
 if "Site" in df.columns:
-    site_list = df["Site"].dropna().unique()
-    if len(site_list) > 0:
-        selected_site = st.sidebar.selectbox("Select Site", site_list)
+    sites = df["Site"].dropna().unique()
+    if len(sites) > 0:
+        selected_site = st.sidebar.selectbox("Select Site", sites)
         df = df[df["Site"] == selected_site]
     else:
         st.sidebar.info("No site values found yet. Enter new records with a Site selected.")
 else:
-    st.sidebar.info("Site column not found. Multi-site support not fully configured.")
+    st.sidebar.info("Site column missing. Multi-site support incomplete.")
 
 if df.empty:
-    st.info("No data available for the selected filters.")
+    st.info("No data available for the selected site.")
     st.stop()
 
 # -----------------------------
@@ -67,69 +67,67 @@ if df.empty:
 st.title("📈 Forecasting & Projections")
 
 st.markdown(
-    "This page shows 7‑day and 30‑day moving averages plus a simple linear regression "
-    "forecast for key metrics."
+    "This page provides 7‑day and 30‑day moving averages, linear regression forecasts, "
+    "and trend charts for key operational metrics."
 )
 
 # -----------------------------
 # METRIC SELECTION
 # -----------------------------
 metric_options = ["Units Produced", "Orders Processed", "Labor Hours"]
-metric = st.selectbox("Select Metric to Forecast", metric_options)
+metric = st.selectbox("Select Metric", metric_options)
 
 metric_df = df[["Date", metric]].dropna().sort_values("Date")
 
-if metric_df.empty:
-    st.info(f"No data available for metric: {metric}")
-    st.stop()
+# -----------------------------
+# FIX DUPLICATE DATES
+# -----------------------------
+metric_df = (
+    metric_df.groupby("Date")[metric]
+    .sum()
+    .reset_index()
+    .sort_values("Date")
+)
 
 # -----------------------------
-# MOVING AVERAGES
+# DAILY FREQUENCY + INTERPOLATION
 # -----------------------------
 metric_df = metric_df.set_index("Date").asfreq("D")
 metric_df[metric] = metric_df[metric].interpolate()
 
-metric_df["7D_MA"] = metric_df[metric].rolling(window=7, min_periods=1).mean()
-metric_df["30D_MA"] = metric_df[metric].rolling(window=30, min_periods=1).mean()
+# -----------------------------
+# MOVING AVERAGES
+# -----------------------------
+metric_df["7D_MA"] = metric_df[metric].rolling(7, min_periods=1).mean()
+metric_df["30D_MA"] = metric_df[metric].rolling(30, min_periods=1).mean()
 
 # -----------------------------
 # LINEAR REGRESSION FORECAST
 # -----------------------------
-history_days = st.sidebar.slider("History window (days) for regression", 30, 180, 90)
+history_days = st.sidebar.slider("History window (days)", 30, 180, 90)
 forecast_horizon = st.sidebar.slider("Forecast horizon (days)", 7, 30, 14)
 
 hist_df = metric_df.last(f"{history_days}D").dropna(subset=[metric])
 
-if len(hist_df) < 5:
-    st.warning("Not enough historical data for a reliable regression. Showing moving averages only.")
-    do_regression = False
-else:
-    do_regression = True
+do_regression = len(hist_df) >= 5
 
 if do_regression:
-    X = (hist_df.index - hist_df.index.min()).days.values.reshape(-1, 1)
+    X = (hist_df.index - hist_df.index.min()).days.values
     y = hist_df[metric].values
 
-    # Simple linear regression using numpy polyfit
-    coeffs = np.polyfit(X.flatten(), y, 1)
-    slope, intercept = coeffs[0], coeffs[1]
+    slope, intercept = np.polyfit(X, y, 1)
 
     last_date = metric_df.index.max()
     future_dates = [last_date + timedelta(days=i) for i in range(1, forecast_horizon + 1)]
     X_future = (pd.to_datetime(future_dates) - hist_df.index.min()).days.values
     y_future = slope * X_future + intercept
 
-    forecast_df = pd.DataFrame(
-        {
-            "Date": future_dates,
-            "Forecast": y_future,
-        }
-    ).set_index("Date")
+    forecast_df = pd.DataFrame({"Date": future_dates, "Forecast": y_future}).set_index("Date")
 else:
     forecast_df = pd.DataFrame(columns=["Forecast"])
 
 # -----------------------------
-# COMBINED HISTORICAL + FORECAST
+# COMBINE HISTORICAL + FORECAST
 # -----------------------------
 combined = metric_df.copy()
 if do_regression and not forecast_df.empty:
@@ -149,12 +147,12 @@ actual_line = base.mark_line(color="#1f77b4").encode(
 
 ma7_line = base.mark_line(color="#ff7f0e", strokeDash=[4, 4]).encode(
     y="7D_MA:Q",
-    tooltip=["Date:T", alt.Tooltip("7D_MA:Q", title="7D MA", format=".2f")]
+    tooltip=["Date:T", alt.Tooltip("7D_MA:Q", title="7‑Day MA", format=".2f")]
 )
 
 ma30_line = base.mark_line(color="#2ca02c", strokeDash=[2, 2]).encode(
     y="30D_MA:Q",
-    tooltip=["Date:T", alt.Tooltip("30D_MA:Q", title="30D MA", format=".2f")]
+    tooltip=["Date:T", alt.Tooltip("30D_MA:Q", title="30‑Day MA", format=".2f")]
 )
 
 if do_regression and not forecast_df.empty:
@@ -169,21 +167,21 @@ else:
 st.altair_chart(chart, use_container_width=True)
 
 # -----------------------------
-# FORECAST TABLES
+# FORECAST TABLE
 # -----------------------------
 st.subheader("Forecast Table")
 
 if do_regression and not forecast_df.empty:
-    forecast_table = forecast_df.copy()
-    forecast_table.index = forecast_table.index.date
-    st.dataframe(
-        forecast_table.reset_index().rename(columns={"index": "Date"}),
-        use_container_width=True,
-    )
+    table = forecast_df.copy()
+    table.index = table.index.date
+    st.dataframe(table.reset_index().rename(columns={"index": "Date"}), use_container_width=True)
 else:
-    st.info("Forecast table not available due to insufficient historical data.")
+    st.info("Not enough historical data for a regression forecast.")
 
-st.subheader("Recent History with Moving Averages")
+# -----------------------------
+# RECENT HISTORY TABLE
+# -----------------------------
+st.subheader("Recent History (with Moving Averages)")
 
 history_table = metric_df[[metric, "7D_MA", "30D_MA"]].last("30D").copy()
 history_table.index = history_table.index.date
