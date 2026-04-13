@@ -12,7 +12,6 @@ DB_FILE = "daily_cost_records.db"
 conn = sqlite3.connect(DB_FILE)
 cursor = conn.cursor()
 
-# Dedicated sites table
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS sites (
     SiteName TEXT PRIMARY KEY
@@ -52,12 +51,12 @@ with col_add:
                 cursor.execute("INSERT INTO sites (SiteName) VALUES (?)", (new_site.strip(),))
                 conn.commit()
                 st.success(f"Site '{new_site.strip()}' added!")
-                st.experimental_rerun()
+                st.rerun()
             except sqlite3.IntegrityError:
                 st.warning("This site already exists.")
 
 # -----------------------------
-# DELETE SITE (OPTIONAL)
+# DELETE SITE
 # -----------------------------
 with col_delete:
     if not sites_df.empty:
@@ -66,4 +65,4 @@ with col_delete:
             cursor.execute("DELETE FROM sites WHERE SiteName = ?", (site_to_delete,))
             conn.commit()
             st.success(f"Site '{site_to_delete}' deleted.")
-            st.experimental_rerun()
+            st.rerun()
