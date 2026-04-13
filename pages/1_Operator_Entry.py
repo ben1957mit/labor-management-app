@@ -30,13 +30,26 @@ conn.commit()
 st.title("📥 Daily Operator Entry")
 
 # -----------------------------
+# LOAD SITES FROM SITE TABLE
+# -----------------------------
+cursor.execute("CREATE TABLE IF NOT EXISTS sites (SiteName TEXT PRIMARY KEY)")
+conn.commit()
+
+cursor.execute("SELECT SiteName FROM sites ORDER BY SiteName")
+sites = [row[0] for row in cursor.fetchall()]
+
+# Fallback if no sites exist yet
+if not sites:
+    sites = ["Dallas", "Plano", "Houston"]
+
+# -----------------------------
 # FORM INPUTS
 # -----------------------------
 with st.form("entry_form"):
 
     st.subheader("Production Information")
 
-    site = st.selectbox("Site", ["Dallas", "Plano", "Houston"])
+    site = st.selectbox("Site", sites)
 
     date = st.date_input("Date")
     shift = st.selectbox("Shift", ["1", "2", "3"])
@@ -121,3 +134,4 @@ if submitted:
 
     conn.commit()
     st.success("Record saved successfully!")
+
