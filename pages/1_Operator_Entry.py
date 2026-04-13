@@ -134,4 +134,3 @@ if submitted:
 
     conn.commit()
     st.success("Record saved successfully!")
-
