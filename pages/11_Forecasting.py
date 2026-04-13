@@ -107,7 +107,9 @@ metric_df["30D_MA"] = metric_df[metric].rolling(30, min_periods=1).mean()
 history_days = st.sidebar.slider("History window (days)", 30, 180, 90)
 forecast_horizon = st.sidebar.slider("Forecast horizon (days)", 7, 30, 14)
 
-hist_df = metric_df.last(f"{history_days}D").dropna(subset=[metric])
+# Safe history selection
+hist_start = metric_df.index.max() - pd.Timedelta(days=history_days)
+hist_df = metric_df[metric_df.index >= hist_start].dropna(subset=[metric])
 
 do_regression = len(hist_df) >= 5
 
@@ -183,7 +185,8 @@ else:
 # -----------------------------
 st.subheader("Recent History (with Moving Averages)")
 
-history_table = metric_df[[metric, "7D_MA", "30D_MA"]].last("30D").copy()
+history_start = metric_df.index.max() - pd.Timedelta(days=30)
+history_table = metric_df[metric_df.index >= history_start][[metric, "7D_MA", "30D_MA"]].copy()
 history_table.index = history_table.index.date
 
 st.dataframe(
