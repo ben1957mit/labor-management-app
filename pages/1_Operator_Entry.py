@@ -8,11 +8,12 @@ st.set_page_config(page_title="Operator Entry", layout="wide")
 DB_FILE = "daily_cost_records.db"
 
 # -----------------------------
-# DATABASE SETUP
+# DATABASE CONNECTION
 # -----------------------------
 conn = sqlite3.connect(DB_FILE)
 cursor = conn.cursor()
 
+# Ensure tables exist
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS records (
     Timestamp TEXT,
@@ -25,32 +26,50 @@ CREATE TABLE IF NOT EXISTS records (
     Site TEXT
 )
 """)
+
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS sites (
+    SiteName TEXT PRIMARY KEY
+)
+""")
+
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS cost_categories (
+    CategoryName TEXT PRIMARY KEY
+)
+""")
+
 conn.commit()
 
 st.title("📥 Daily Operator Entry")
 
 # -----------------------------
-# LOAD SITES FROM SITE TABLE
+# LOAD SITES
 # -----------------------------
-cursor.execute("CREATE TABLE IF NOT EXISTS sites (SiteName TEXT PRIMARY KEY)")
-conn.commit()
-
 cursor.execute("SELECT SiteName FROM sites ORDER BY SiteName")
 sites = [row[0] for row in cursor.fetchall()]
 
-# Fallback if no sites exist yet
 if not sites:
     sites = ["Dallas", "Plano", "Houston"]
 
 # -----------------------------
-# FORM INPUTS
+# LOAD COST CATEGORIES
+# -----------------------------
+cursor.execute("SELECT CategoryName FROM cost_categories ORDER BY CategoryName")
+cost_items = [row[0] for row in cursor.fetchall()]
+
+if not cost_items:
+    st.error("No cost categories found. Add some in Category Management.")
+    st.stop()
+
+# -----------------------------
+# FORM
 # -----------------------------
 with st.form("entry_form"):
 
     st.subheader("Production Information")
 
     site = st.selectbox("Site", sites)
-
     date = st.date_input("Date")
     shift = st.selectbox("Shift", ["1", "2", "3"])
 
@@ -58,8 +77,11 @@ with st.form("entry_form"):
     orders = st.number_input("Orders Processed", min_value=0.0)
     labor = st.number_input("Labor Hours", min_value=0.0)
 
+    # -----------------------------
+    # DYNAMIC COST CATEGORIES
+    # -----------------------------
     st.subheader("Budget vs Actual Cost Categories")
-    cost_items = ["Labor", "Equipment", "Supplies", "Transportation", "Admin"]
+
     budget = {}
     actual = {}
     variance = {}
@@ -73,6 +95,9 @@ with st.form("entry_form"):
 
         variance[item] = actual[item] - budget[item]
 
+    # -----------------------------
+    # TRAILER METRICS
+    # -----------------------------
     st.subheader("Trailer / Inbound / Outbound Metrics")
 
     inbound = st.number_input("Inbound Loads", min_value=0.0)
@@ -89,35 +114,22 @@ with st.form("entry_form"):
 if submitted:
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    data = {
-        # Budget / Actual / Variance
-        "Budget_Labor": budget["Labor"],
-        "Actual_Labor": actual["Labor"],
-        "Variance_Labor": variance["Labor"],
+    # Build dynamic JSON payload
+    data = {}
 
-        "Budget_Equipment": budget["Equipment"],
-        "Actual_Equipment": actual["Equipment"],
-        "Variance_Equipment": variance["Equipment"],
+    for item in cost_items:
+        data[f"Budget_{item}"] = budget[item]
+        data[f"Actual_{item}"] = actual[item]
+        data[f"Variance_{item}"] = variance[item]
 
-        "Budget_Supplies": budget["Supplies"],
-        "Actual_Supplies": actual["Supplies"],
-        "Variance_Supplies": variance["Supplies"],
-
-        "Budget_Transportation": budget["Transportation"],
-        "Actual_Transportation": actual["Transportation"],
-        "Variance_Transportation": variance["Transportation"],
-
-        "Budget_Admin": budget["Admin"],
-        "Actual_Admin": actual["Admin"],
-        "Variance_Admin": variance["Admin"],
-
-        # Trailer Metrics
+    # Trailer metrics
+    data.update({
         "Actual_Inbound Loads": inbound,
         "Actual_Outbound Loads": outbound,
         "Actual_Detention Fees": detention,
         "Actual_Lumper Fees": lumper,
         "Actual_Pallet Costs": pallets
-    }
+    })
 
     cursor.execute("""
         INSERT INTO records VALUES (?, ?, ?, ?, ?, ?, ?, ?)
