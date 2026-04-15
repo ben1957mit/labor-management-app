@@ -1,27 +1,13 @@
 import streamlit as st
 
+st.set_page_config(page_title="Home", layout="wide")
+
 # -----------------------------------------
-# SIDEBAR NAVIGATION
+# OPTIONAL: Sidebar header (safe)
 # -----------------------------------------
-st.sidebar.title("Navigation")
+st.sidebar.title("Labor Management System")
 
-st.sidebar.markdown("""
-### Data Entry
-- Operator Entry
-- Site Management
-- Category Management
-
-### Data Tools
-- Database Viewer
-
-### Dashboards
-- Dynamic Dashboard
-- Daily Summary
-- Rollup Dashboard
-
-### Forecasting
-- Forecasting
-""")
+st.sidebar.info("Use the sidebar page list to navigate.")
 
 # -----------------------------------------
 # MAIN HOME PAGE
@@ -39,4 +25,4 @@ Use the sidebar to navigate through:
 - Forecasting and analytics  
 """)
 
-st.info("Select a page from the sidebar to get started.")
+st.success("Select a page from the sidebar to get started.")
