@@ -32,12 +32,9 @@ if st.button("Add Category"):
             )
             conn.commit()
             st.success(f"Category '{new_category}' added successfully")
+            st.experimental_rerun()
         except Exception as e:
             st.error(f"Error: {e}")
-
-# Reload categories after insert
-cursor.execute("SELECT CategoryName FROM cost_categories ORDER BY CategoryName")
-categories = [row[0] for row in cursor.fetchall()]
 
 # ---------------------------------------------------
 # LIST + DELETE CATEGORIES
@@ -55,3 +52,4 @@ else:
             conn.commit()
             st.warning(f"Deleted category: {cat}")
             st.experimental_rerun()
+
