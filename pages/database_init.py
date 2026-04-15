@@ -8,7 +8,9 @@ def init_db():
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
 
-    # Records table
+    # ---------------------------------------------------
+    # RECORDS TABLE
+    # ---------------------------------------------------
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS records (
         Timestamp TEXT,
@@ -22,21 +24,27 @@ def init_db():
     )
     """)
 
-    # Sites table
+    # ---------------------------------------------------
+    # SITES TABLE
+    # ---------------------------------------------------
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS sites (
         SiteName TEXT PRIMARY KEY
     )
     """)
 
-    # Cost categories table
+    # ---------------------------------------------------
+    # COST CATEGORIES TABLE
+    # ---------------------------------------------------
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS cost_categories (
         CategoryName TEXT PRIMARY KEY
     )
     """)
 
-    # Default categories (only inserted if missing)
+    # ---------------------------------------------------
+    # DEFAULT COST CATEGORIES (ONLY IF MISSING)
+    # ---------------------------------------------------
     cursor.executemany(
         "INSERT OR IGNORE INTO cost_categories VALUES (?)",
         [
@@ -50,3 +58,6 @@ def init_db():
 
     conn.commit()
     return conn, cursor
+
+
+   
