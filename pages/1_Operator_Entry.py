@@ -7,64 +7,80 @@ st.set_page_config(page_title="Operator Entry", layout="wide")
 
 DB_FILE = "daily_cost_records.db"
 
-# -----------------------------
-# DATABASE CONNECTION
-# -----------------------------
-conn = sqlite3.connect(DB_FILE)
-cursor = conn.cursor()
+# ---------------------------------------------------
+# DATABASE INITIALIZATION
+# ---------------------------------------------------
+def init_db():
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
 
-# Ensure tables exist
-cursor.execute("""
-CREATE TABLE IF NOT EXISTS records (
-    Timestamp TEXT,
-    Date TEXT,
-    Shift TEXT,
-    UnitsProduced REAL,
-    OrdersProcessed REAL,
-    LaborHours REAL,
-    Data JSON,
-    Site TEXT
-)
-""")
+    # Records table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS records (
+        Timestamp TEXT,
+        Date TEXT,
+        Shift TEXT,
+        UnitsProduced REAL,
+        OrdersProcessed REAL,
+        LaborHours REAL,
+        Data JSON,
+        Site TEXT
+    )
+    """)
 
-cursor.execute("""
-CREATE TABLE IF NOT EXISTS sites (
-    SiteName TEXT PRIMARY KEY
-)
-""")
+    # Sites table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS sites (
+        SiteName TEXT PRIMARY KEY
+    )
+    """)
 
-cursor.execute("""
-CREATE TABLE IF NOT EXISTS cost_categories (
-    CategoryName TEXT PRIMARY KEY
-)
-""")
+    # Cost categories table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS cost_categories (
+        CategoryName TEXT PRIMARY KEY
+    )
+    """)
 
-conn.commit()
+    # Default categories (only inserted if missing)
+    cursor.executemany(
+        "INSERT OR IGNORE INTO cost_categories VALUES (?)",
+        [
+            ("Labor",),
+            ("Equipment",),
+            ("Supplies",),
+            ("Transportation",),
+            ("Admin",)
+        ]
+    )
 
-st.title("📥 Daily Operator Entry")
+    conn.commit()
+    return conn, cursor
 
-# -----------------------------
-# LOAD SITES
-# -----------------------------
+
+# Initialize DB
+conn, cursor = init_db()
+
+# ---------------------------------------------------
+# LOAD DATA
+# ---------------------------------------------------
 cursor.execute("SELECT SiteName FROM sites ORDER BY SiteName")
 sites = [row[0] for row in cursor.fetchall()]
 
 if not sites:
     sites = ["Dallas", "Plano", "Houston"]
 
-# -----------------------------
-# LOAD COST CATEGORIES
-# -----------------------------
 cursor.execute("SELECT CategoryName FROM cost_categories ORDER BY CategoryName")
 cost_items = [row[0] for row in cursor.fetchall()]
 
-if not cost_items:
-    st.error("No cost categories found. Add some in Category Management.")
-    st.stop()
+# ---------------------------------------------------
+# PAGE TITLE
+# ---------------------------------------------------
+st.title("📥 Daily Operator Entry")
 
-# -----------------------------
-# FORM
-# -----------------------------
+# ---------------------------------------------------
+# ENTRY FORM
+# ---------------------------------------------------
 with st.form("entry_form"):
 
     st.subheader("Production Information")
@@ -77,9 +93,9 @@ with st.form("entry_form"):
     orders = st.number_input("Orders Processed", min_value=0.0)
     labor = st.number_input("Labor Hours", min_value=0.0)
 
-    # -----------------------------
-    # DYNAMIC COST CATEGORIES
-    # -----------------------------
+    # ---------------------------------------------------
+    # COST CATEGORIES (DYNAMIC)
+    # ---------------------------------------------------
     st.subheader("Budget vs Actual Cost Categories")
 
     budget = {}
@@ -95,9 +111,9 @@ with st.form("entry_form"):
 
         variance[item] = actual[item] - budget[item]
 
-    # -----------------------------
+    # ---------------------------------------------------
     # TRAILER METRICS
-    # -----------------------------
+    # ---------------------------------------------------
     st.subheader("Trailer / Inbound / Outbound Metrics")
 
     inbound = st.number_input("Inbound Loads", min_value=0.0)
@@ -108,13 +124,13 @@ with st.form("entry_form"):
 
     submitted = st.form_submit_button("Save Record")
 
-# -----------------------------
+# ---------------------------------------------------
 # SAVE RECORD
-# -----------------------------
+# ---------------------------------------------------
 if submitted:
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    # Build dynamic JSON payload
+    # Build JSON payload dynamically
     data = {}
 
     for item in cost_items:
@@ -122,7 +138,6 @@ if submitted:
         data[f"Actual_{item}"] = actual[item]
         data[f"Variance_{item}"] = variance[item]
 
-    # Trailer metrics
     data.update({
         "Actual_Inbound Loads": inbound,
         "Actual_Outbound Loads": outbound,
