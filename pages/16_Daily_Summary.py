@@ -34,3 +34,13 @@ st.write(full_df[["UnitsProduced", "OrdersProcessed", "LaborHours"]].sum())
 st.subheader("Cost Summary")
 cost_cols = [c for c in full_df.columns if c.startswith("Actual_")]
 st.write(full_df[cost_cols].sum())
+import io
+
+st.subheader("Export Data")
+
+csv = full_df.to_csv(index=False).encode("utf-8")
+st.download_button("Download CSV", csv, "data.csv", "text/csv")
+
+excel_buffer = io.BytesIO()
+full_df.to_excel(excel_buffer, index=False)
+st.download_button("Download Excel", excel_buffer.getvalue(), "data.xlsx")
