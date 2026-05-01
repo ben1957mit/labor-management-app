@@ -39,16 +39,30 @@ labor_df = st.data_editor(default_labor, num_rows="dynamic")
 # Convert labor table → LaborData objects
 labor_entries = []
 for _, row in labor_df.iterrows():
+
+    # Skip invalid rows
+    if pd.isna(row["role"]) or pd.isna(row["hourly_rate"]) or pd.isna(row["hours"]):
+        continue
+
+    try:
+        hourly_rate = float(row["hourly_rate"])
+        overtime_rate = float(row["overtime_rate"])
+        hours = float(row["hours"])
+        overtime_hours = float(row["overtime_hours"])
+    except:
+        continue
+
     role = LaborRole(
-        name=row["role"],
-        hourly_rate=row["hourly_rate"],
-        overtime_rate=row["overtime_rate"]
+        name=str(row["role"]).strip(),
+        hourly_rate=hourly_rate,
+        overtime_rate=overtime_rate
     )
+
     labor_entries.append(
         LaborData(
             role=role,
-            hours=row["hours"],
-            overtime_hours=row["overtime_hours"]
+            hours=hours,
+            overtime_hours=overtime_hours
         )
     )
 
@@ -65,13 +79,35 @@ default_budget = pd.DataFrame({
 
 budget_df = st.data_editor(default_budget, num_rows="dynamic")
 
-# Convert budget table → BudgetCategory objects
+# Convert budget table → BudgetCategory objects (with validation)
 categories = {}
+
 for _, row in budget_df.iterrows():
-    cat = row["category"]
+
+    # Skip empty or invalid rows
+    if pd.isna(row["category"]) or pd.isna(row["item"]) or pd.isna(row["amount"]):
+        continue
+
+    try:
+        amount = float(row["amount"])
+    except:
+        continue
+
+    cat = str(row["category"]).strip()
+    item_name = str(row["item"]).strip()
+
+    if cat == "" or item_name == "":
+        continue
+
     if cat not in categories:
         categories[cat] = BudgetCategory(name=cat, items=[])
-    categories[cat].items.append(BudgetItem(row["item"], row["amount"]))
+
+    categories[cat].items.append(
+        BudgetItem(
+            name=item_name,
+            amount=amount
+        )
+    )
 
 # ---------------------------------------------------------
 # BUILD BUDGET ENGINE
@@ -148,3 +184,4 @@ st.download_button(
     file_name=f"{selected_location}_budget.xlsx",
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 )
+
