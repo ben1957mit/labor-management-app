@@ -1,5 +1,3 @@
-# modules/budget_defaults.py
-
 distribution_center_budget = {
     "Facility & Building Costs": [
         "Lease or mortgage payments",
